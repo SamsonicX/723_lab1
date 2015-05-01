@@ -6,14 +6,16 @@ class IndexView(TemplateView):
     template_name = "index.html"
 
     def get_context_data(self, **kwargs):
+        # Заполнение списка предметов
         subjects = [
-            Subject("timp"),
-            Subject("eis"),
-            Subject("philosophy"),
-            Subject("english"),
-            Subject("sport")
+            Subject(0, "timp"),
+            Subject(1, "eis"),
+            Subject(2, "philosophy"),
+            Subject(3, "english"),
+            Subject(4, "sport")
         ]
 
+        # Заполнение списка студентов
         list_students = [
             Student(0, "surname1", "name1", "patronymic1", "group1", 20),
             Student(1, "surname2", "name2", "patronymic2", "group2", 20),
@@ -27,55 +29,66 @@ class IndexView(TemplateView):
             Student(9, "surname10", "name10", "patronymic10", "group1", 20),
         ]
 
-        list_score = Score()
-        list_score.add_fixed(0, 4, 5, 3, 4, 2)
-        list_score.add_fixed(1, 4, 5, 5, 5, 4)
-        list_score.add_fixed(2, 4, 5, 5, 5, 4)
-        list_score.add_fixed(3, 2, 3, 5, 5, 4)
-        list_score.add_fixed(4, 2, 2, 3, 3, 2)
-        list_score.add_fixed(5, 4, 5, 2, 5, 4)
-        list_score.add_fixed(6, 4, 5, 5, 5, 4)
-        list_score.add_fixed(7, 4, 5, 5, 3, 4)
-        list_score.add_fixed(8, 2, 5, 5, 5, 4)
-        list_score.add_fixed(9, 2, 1, 1, 1, 4)
-
-        list_average = []
+        # Заполнение массива оценок случайными значениями от 2 до 5
+        from random import randint
+        list_score = []
         for student_id in range(len(list_students)):
-            counter = 0
             for subject_id in range(len(subjects)):
-                counter += list_score(student_id * len(subjects) + subject_id).value
-            list_average.append(counter / len(subjects))
+                list_score.append(Score(student_id, subject_id, randint(2, 5)))
 
+        list_student_average = []  # Лист средних оценок на студента
+        excellent_students = ' '  # Строка со студентами, которых надо будет похвалить (в ней будет ТОЛЬКО фамилия)
+        bad_students = ' '  # Строка со студентами, которых надо будет отчислить (в ней будет ТОЛЬКО фамилия)
+        counter_subjects = [0.] * len(subjects)  # Лист средних оценок на предметы
+
+        # Цикл, расчитывающий среднее значение оценки у студента. Так же идёт суммирование всех оценок по предметам
+        for student_id in range(len(list_students)):
+            counter_st = 0.
+            for subject_id in range(len(subjects)):
+                counter_st += list_score[student_id * len(subjects) + subject_id].value
+                counter_subjects[subject_id] += list_score[student_id * len(subjects) + subject_id].value
+            list_student_average.append(counter_st / len(subjects))
+            if list_student_average[student_id] > 4.5:
+                excellent_students += (list_students[student_id].person.familia) + ' '
+            if list_student_average[student_id] < 3:
+                bad_students += (list_students[student_id].person.familia) + ' '
+
+        # Нахождение среднего значения по предмету (в counter_subjects до этого были только сумма оценок по предмету)
+        for subject_id in range(len(subjects)):
+            counter_subjects[subject_id] /= len(list_students)
+
+        # Сопоставление статистики
         students_statistics = []
-        for student in len(list_students):
+        for student_id in range(len(list_students)):
             student_info = {
                 'id': student_id + 1,
-                'fio': student.familia + " " + student.imya + " " + student.otchestvo,
-                'timp': list_score(student_id * len(subjects)).value,
-                'eis': list_score(student_id * len(subjects) + 1).value,
-                'philosophy': list_score(student_id * len(subjects) + 2).value,
-                'sport': list_score(student_id * len(subjects) + 3).value,
-                'average': list_average(student_id)
+                'fio': list_students[student_id].person.familia + ' ' + list_students[student_id].person.imya + ' ' + list_students[student_id].person.otchestvo,
+                'timp': list_score[student_id * len(subjects)].value,
+                'eis': list_score[student_id * len(subjects) + 1].value,
+                'philosophy': list_score[student_id * len(subjects) + 2].value,
+                'english': list_score[student_id * len(subjects) + 3].value,
+                'sport': list_score[student_id * len(subjects) + 4].value,
+                'average': list_student_average[student_id]
             }
             students_statistics.append(student_info)
+
+        subjects_info = {
+            'id': '',
+            'fio': 'Итого',
+            'timp': counter_subjects[0],
+            'eis': counter_subjects[1],
+            'philosophy': counter_subjects[2],
+            'english': counter_subjects[3],
+            'sport': counter_subjects[4]
+        }
+        students_statistics.append(subjects_info)
 
         context = super(IndexView, self).get_context_data(**kwargs)
         context.update(
             {
-                'students_statistics': [
-                    {
-                        'id': 1,
-                        'fio': 'Someone',
-                        'timp': 2,
-                        'eis': 3,
-                        'philosophy': 4,
-                        'english': 5,
-                        'sport': 2.3,
-                        'average': 2.3,
-                    }
-                ],
-                'excellent_students': 'Student A, Student B',
-                'bad_students': 'Student C, Student D'
+                'students_statistics': students_statistics,
+                'excellent_students': excellent_students,
+                'bad_students': bad_students
             }
         )
         return context
@@ -96,19 +109,13 @@ class Student(Person):
 
 
 class Subject:
-    def __init__(self, name):
-        self.list.append(name)
+    def __init__(self, id, name):
+        self.id = id
+        self.name = name
 
 
 class Score:
-    table = []
-
-    def __init__ (self, st_id, sb_id, value):
-        self.table.append((st_id, sb_id, value))
-
-    def add_fixed(self, st_id, value1, value2, value3, value4, value5):
-        self.table.append((st_id, 1, value1))
-        self.table.append((st_id, 2, value2))
-        self.table.append((st_id, 3, value3))
-        self.table.append((st_id, 4, value4))
-        self.table.append((st_id, 5, value5))
+    def __init__(self, student_id, subject_id, value):
+        self.student_id = student_id
+        self.subject_id = subject_id
+        self.value = value
